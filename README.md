@@ -24,6 +24,12 @@ Default values are also as they are below:
 
     $mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
 
+These can be set in your code or a mysql-session-config.php file that is
+in the same directory as mysql-session.php.
+
+Copy mysql-session-config.php.dist to mysql-session-config.php and
+modify any variables.
+
 Use the following table for session data storage:
 
     CREATE TABLE session (

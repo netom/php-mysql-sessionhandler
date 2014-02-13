@@ -26,6 +26,8 @@ $mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
 
 $mysql_session_db_handle = null;
 
+@include 'mysql-session-config.php';
+
 function mysql_session_open($savePath, $sessionName) {
     global
         $mysql_session_server, $mysql_session_user, $mysql_session_password,
