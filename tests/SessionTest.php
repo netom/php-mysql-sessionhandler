@@ -18,7 +18,7 @@ class SessionTest extends PHPUnit_Framework_TestCase
 
     public function testSessionWR() {
 
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             $this->assertTrue(mysql_session_open(null, null));
 
             $sessionvars = array("test_data" => "data #$i");
@@ -47,7 +47,7 @@ class SessionTest extends PHPUnit_Framework_TestCase
             $bigvalue .= 'x';
         }
 
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 0; $i < 10; $i++) {
             $this->assertTrue(mysql_session_open(null, null));
 
             $sessionvars = array("test_data" => $bigvalue . " data #$i");
