@@ -1,16 +1,5 @@
 <?php
 
-/*
-
-CREATE TABLE session (
-  id VARBINARY(128) NOT NULL PRIMARY KEY,
-  modified INT(11) UNSIGNED NOT NULL,
-  lifetime INT(11) UNSIGNED NOT NULL,
-  data MEDIUMBLOB NOT NULL
-) ENGINE=InnoDB;
-
-*/
-
 $mysql_session_server = '127.0.0.1:3306';
 $mysql_session_user = 'php';
 $mysql_session_password = 'session123';
@@ -23,6 +12,9 @@ $mysql_session_modified_column = 'modified';
 $mysql_session_lifetime_column = 'lifetime';
 
 $mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
+
+$mysql_session_use_locking = true;
+$mysql_session_lock_timeout = 10;
 
 $mysql_session_db_handle = null;
 
@@ -70,7 +62,36 @@ function mysql_session_read($id) {
         $mysql_session_db, $mysql_session_table,
         $mysql_session_id_column, $mysql_session_data_column,
         $mysql_session_modified_column, $mysql_session_lifetime_column,
+        $mysql_session_lock_timeout, $mysql_session_use_locking,
         $mysql_session_db_handle;
+
+    if ($mysql_session_use_locking) {
+        print "boo";
+        $res = mysql_query(
+            "SELECT GET_LOCK('" .
+            mysql_real_escape_string($id, $mysql_session_db_handle) .
+            "', $mysql_session_lock_timeout) as l",
+            $mysql_session_db_handle
+        );
+
+        if ($res === false) {
+            trigger_error(
+                "MySQL session save handler: could not get lock for session: " . mysql_error($mysql_session_db_handle),
+                E_USER_ERROR
+            );
+            return '';
+        }
+
+        $row = mysql_fetch_assoc($res);
+
+        if ($row['l'] !== '1') {
+            trigger_error(
+                "MySQL session save handler: could not get lock for session: lock timed out.",
+                E_USER_ERROR
+            );
+            return '';
+        }
+    }
 
     $res = mysql_query(
         "SELECT $mysql_session_data_column AS v FROM $mysql_session_table " .

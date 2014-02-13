@@ -24,6 +24,9 @@ Default values are also as they are below:
 
     $mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
 
+    $mysql_session_use_locking = true;
+    $mysql_session_lock_timeout = 10;
+
 These can be set in your code or a mysql-session-config.php file that is
 in the same directory as mysql-session.php.
 

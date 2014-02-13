@@ -13,3 +13,5 @@ $mysql_session_lifetime_column = 'lifetime';
 
 $mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
 
+$mysql_session_use_locking = true;
+$mysql_session_lock_timeout = 10;
