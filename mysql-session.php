@@ -1,24 +1,35 @@
 <?php
 
+/*
+
+CREATE TABLE session (
+  id VARBINARY(128) NOT NULL PRIMARY KEY,
+  modified INT(11) UNSIGNED NOT NULL,
+  lifetime INT(11) UNSIGNED NOT NULL,
+  data MEDIUMBLOB NOT NULL
+) ENGINE=InnoDB;
+
+*/
+
 $mysql_session_server = '127.0.0.1:3307';
 $mysql_session_user = 'php';
 $mysql_session_password = 'session123';
 $mysql_session_db = 'session';
 $mysql_session_table = 'session';
+
 $mysql_session_id_column = 'id';
-$mysql_session_value_column = 'value';
-$mysql_session_expiration_column = 'expires';
+$mysql_session_data_column = 'data';
+$mysql_session_modified_column = 'modified';
+$mysql_session_lifetime_column = 'lifetime';
+
+$mysql_session_lifetime = get_cfg_var('session.gc_maxlifetime');
+
 $mysql_session_db_handle = null;
 
 function mysql_session_open($savePath, $sessionName) {
     global
-        $mysql_session_server, $mysql_session_port, $mysql_session_user,
-        $mysql_session_password, $mysql_session_db, $mysql_session_table,
-        $mysql_session_id_column, $mysql_session_expiration_column,
-        $mysql_session_value_column, $mysql_session_db_handle;
-
-    $mysql_session_save_path = $savePath;
-    $mysql_session_name = $sessionName;
+        $mysql_session_server, $mysql_session_user, $mysql_session_password,
+        $mysql_session_db, $mysql_session_db_handle;
 
     $mysql_session_db_handle = mysql_connect($mysql_session_server, $mysql_session_user, $mysql_session_password);
 
@@ -53,18 +64,17 @@ function mysql_session_close() {
 
 function mysql_session_read($id) {
     global
-        $mysql_session_server, $mysql_session_port, $mysql_session_user,
-        $mysql_session_password, $mysql_session_db, $mysql_session_table,
-        $mysql_session_id_column, $mysql_session_expiration_column,
-        $mysql_session_value_column, $mysql_session_db_handle;
-
-    $t = time();
+        $mysql_session_server, $mysql_session_user, $mysql_session_password,
+        $mysql_session_db, $mysql_session_table,
+        $mysql_session_id_column, $mysql_session_data_column,
+        $mysql_session_modified_column, $mysql_session_lifetime_column,
+        $mysql_session_db_handle;
 
     $res = mysql_query(
-        "SELECT $mysql_session_value_column AS v FROM $mysql_session_table " .
+        "SELECT $mysql_session_data_column AS v FROM $mysql_session_table " .
         "WHERE $mysql_session_id_column = '" .
         mysql_real_escape_string($id, $mysql_session_db_handle) .
-        "' AND $mysql_session_expiration_column > $t",
+        "' AND $mysql_session_modified_column + $mysql_session_lifetime_column >= UNIX_TIMESTAMP()",
         $mysql_session_db_handle
     );
 
@@ -92,16 +102,22 @@ function mysql_session_write($id, $data) {
      * Gotta try one day. */
 
     global
-        $mysql_session_server, $mysql_session_port, $mysql_session_user,
-        $mysql_session_password, $mysql_session_db, $mysql_session_table,
-        $mysql_session_id_column, $mysql_session_expiration_column,
-        $mysql_session_value_column, $mysql_session_db_handle;
-
-    $new_expiration = time() + get_cfg_var("session.gc_maxlifetime");
+        $mysql_session_table, $mysql_session_id_column,
+        $mysql_session_data_column, $mysql_session_modified_column,
+        $mysql_session_lifetime_column, $mysql_session_lifetime,
+        $mysql_session_db_handle;
 
     $res = mysql_query(
-        "SELECT * FROM $mysql_session_table WHERE $mysql_session_id_column = '" .
-        mysql_real_escape_string($id) . "'",
+        "INSERT INTO $mysql_session_table " .
+        "($mysql_session_id_column, $mysql_session_modified_column, " .
+        "$mysql_session_lifetime_column, $mysql_session_data_column) " . 
+        "VALUES ('" . mysql_real_escape_string($id) . "', " .
+        "UNIX_TIMESTAMP(), $mysql_session_lifetime, " .
+        "'" . mysql_real_escape_string($data) . "') " .
+        "ON DUPLICATE KEY UPDATE " .
+        "$mysql_session_data_column = VALUES($mysql_session_data_column), " .
+        "$mysql_session_modified_column = VALUES($mysql_session_modified_column), " .
+        "$mysql_session_lifetime_column = VALUES($mysql_session_lifetime_column)",
         $mysql_session_db_handle
     );
 
@@ -111,37 +127,6 @@ function mysql_session_write($id, $data) {
             E_USER_ERROR
         );
         return false;
-    }
-
-    if(mysql_num_rows($res)) {
-        $res = mysql_query(
-            "UPDATE $mysql_session_table SET $mysql_session_expiration_column = $new_expiration, " .
-            "$mysql_session_value_column = '" . mysql_real_escape_string($data) . "' " .
-            "WHERE $mysql_session_id_column = '" . mysql_real_escape_string($id) . "'",
-            $mysql_session_db_handle
-        );
-        if ($res === false) {
-            trigger_error(
-                "MySQL session save handler: could save session data: " . mysql_error($mysql_session_db_handle),
-                E_USER_ERROR
-            );
-            return false;
-        }
-    } else {
-        $res = mysql_query(
-            "INSERT INTO $mysql_session_table " .
-            "($mysql_session_id_column, $mysql_session_expiration_column, $mysql_session_value_column) " . 
-            "VALUES ('" . mysql_real_escape_string($id) . "'" .
-            ", $new_expiration, '" . mysql_real_escape_string($data) . "')",
-            $mysql_session_db_handle
-        );
-        if ($res === false) {
-            trigger_error(
-                "MySQL session save handler: could save session data: " . mysql_error($mysql_session_db_handle),
-                E_USER_ERROR
-            );
-            return false;
-        }
     }
 
     if(mysql_affected_rows($mysql_session_db_handle)) {
@@ -157,10 +142,7 @@ function mysql_session_write($id, $data) {
 
 function mysql_session_destroy($id) {
     global
-        $mysql_session_server, $mysql_session_port, $mysql_session_user,
-        $mysql_session_password, $mysql_session_db, $mysql_session_table,
-        $mysql_session_id_column, $mysql_session_expiration_column,
-        $mysql_session_value_column, $mysql_session_db_handle;
+        $mysql_session_table, $mysql_session_id_column, $mysql_session_db_handle;
 
     $res = mysql_query(
         "DELETE FROM $mysql_session_table WHERE $mysql_session_id_column = '" .
@@ -182,15 +164,12 @@ function mysql_session_destroy($id) {
 
 function mysql_session_gc($maxlifetime) {
     global
-        $mysql_session_server, $mysql_session_port, $mysql_session_user,
-        $mysql_session_password, $mysql_session_db, $mysql_session_table,
-        $mysql_session_id_column, $mysql_session_expiration_column,
-        $mysql_session_value_column, $mysql_session_db_handle;
-
-    $t = time();
+        $mysql_session_table, $mysql_session_modified_column,
+        $mysql_session_lifetime_column, $mysql_session_db_handle;
 
     $res = mysql_query(
-        "DELETE FROM $mysql_session_table WHERE $mysql_session_expiration_column < " . $t,
+        "DELETE FROM $mysql_session_table WHERE " .
+        "$mysql_session_modified_column + $mysql_session_lifetime_column < UNIX_TIMESTAMP()",
         $mysql_session_db_handle
     );
 
