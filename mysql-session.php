@@ -123,21 +123,13 @@ function mysql_session_write($id, $data) {
 
     if ($res === false) {
         trigger_error(
-            "MySQL session save handler: could save session data: " . mysql_error($mysql_session_db_handle),
+            "MySQL session save handler: could not save session data: " . mysql_error($mysql_session_db_handle),
             E_USER_ERROR
         );
         return false;
     }
 
-    if(mysql_affected_rows($mysql_session_db_handle)) {
-        return true;
-    } else {
-        trigger_error(
-            "MySQL session save handler: could save session data: " . mysql_error($mysql_session_db_handle),
-            E_USER_ERROR
-        );
-        return false;
-    }
+    return true;
 }
 
 function mysql_session_destroy($id) {
