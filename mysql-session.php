@@ -11,7 +11,7 @@ CREATE TABLE session (
 
 */
 
-$mysql_session_server = '127.0.0.1:3307';
+$mysql_session_server = '127.0.0.1:3306';
 $mysql_session_user = 'php';
 $mysql_session_password = 'session123';
 $mysql_session_db = 'session';
